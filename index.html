@@ -1,1 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Admin Panel</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
 
+  <!-- Login Section -->
+  <div id="login-section" class="container">
+    <h1>Admin Login</h1>
+
+    <input
+      type="email"
+      id="loginEmail"
+      placeholder="Enter Email"
+      autocomplete="username"
+    />
+
+    <input
+      type="password"
+      id="loginPassword"
+      placeholder="Enter Password"
+      autocomplete="current-password"
+    />
+
+    <button id="loginBtn">Login</button>
+
+    <p id="loginMessage"></p>
+  </div>
+
+  <!-- Dashboard Section -->
+  <div id="dashboard-section" class="container hidden">
+    <div class="top-bar">
+      <h1>Video Admin Panel</h1>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
+    </div>
+
+    <h2>Add New Video</h2>
+
+    <input type="file" id="thumbnailFile" accept="image/*" />
+
+    <input
+      type="text"
+      id="title"
+      placeholder="Video Title"
+    />
+
+    <textarea
+      id="description"
+      placeholder="Video Description"
+      rows="4"
+    ></textarea>
+
+    <input
+      type="number"
+      id="price"
+      placeholder="Price (e.g. 49)"
+    />
+
+    <input
+      type="url"
+      id="fileLink"
+      placeholder="Terabox / DiskWala Link"
+    />
+
+    <button id="saveBtn">Save Video</button>
+
+    <p id="saveMessage"></p>
+
+    <hr />
+
+    <h2>All Videos</h2>
+    <div id="videoList"></div>
+  </div>
+
+  <!-- JavaScript -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
