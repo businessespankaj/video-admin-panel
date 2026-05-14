@@ -6,7 +6,12 @@ const fetch = require("node-fetch");
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-
+app.get("/", (req, res) => {
+    res.json({
+        status: "ok",
+        message: "Cashfree backend running successfully 🚀"
+    });
+});
 // ======================
 // CASHFREE CONFIG
 // ======================
