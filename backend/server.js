@@ -49,7 +49,17 @@ app.post("/create-order", async (req, res) => {
         });
 
         const data = await response.json();
-        res.json(data);
+
+// debug log
+console.log(data);
+
+// Cashfree se payment link extract karo
+const paymentLink = data?.payment_link || data?.data?.payment_link;
+
+res.json({
+    payment_link: paymentLink,
+    raw: data
+});
 
     } catch (error) {
         res.status(500).json({ error: error.message });
