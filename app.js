@@ -265,3 +265,42 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
         }
+// =========================
+// ADMIN LOGIN SYSTEM
+// =========================
+function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  // Apna username aur password yahan set karo
+  const ADMIN_USERNAME = "9090@gmail.com";
+  const ADMIN_PASSWORD = "9090";
+
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    // Login success
+    document.getElementById("loginSection").style.display = "none";
+    document.getElementById("adminPanel").style.display = "block";
+
+    // Browser me login remember rakho
+    localStorage.setItem("adminLoggedIn", "true");
+  } else {
+    alert("Invalid username or password");
+  }
+}
+
+// Page load par check karo
+window.addEventListener("load", function () {
+  if (localStorage.getItem("adminLoggedIn") === "true") {
+    const loginSection = document.getElementById("loginSection");
+    const adminPanel = document.getElementById("adminPanel");
+
+    if (loginSection) loginSection.style.display = "none";
+    if (adminPanel) adminPanel.style.display = "block";
+  }
+});
+
+// Logout function
+function logout() {
+  localStorage.removeItem("adminLoggedIn");
+  location.reload();
+}
