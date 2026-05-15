@@ -41,7 +41,6 @@ app.post("/create-order", async (req, res) => {
                 "x-client-secret": CASHFREE_SECRET,
                 "x-api-version": "2022-09-01"
             },
-            const orderId = "order_" + Date.now();
 
 body: JSON.stringify({
   orderId: orderId,
