@@ -46,7 +46,7 @@ body: JSON.stringify({
   orderId: orderId,
   videoId: videoId,
   amount: amount,
-  customerPhone: "9999999999"
+  customerPhone: "9999999999",
 })
                     customer_email: "test@gmail.com"
                 },
