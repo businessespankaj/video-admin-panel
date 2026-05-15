@@ -43,17 +43,18 @@ app.post("/create-order", async (req, res) => {
             },
 
 body: JSON.stringify({
-  orderId: orderId,
-  videoId: videoId,
-  amount: amount,
-  customerPhone: "9999999999",
+    order_id: orderId,
+    order_amount: amount,
+    order_currency: "INR",
+    customer_details: {
+        customer_id: "cust_" + Date.now(),
+        customer_phone: customerPhone || "9999999999",
+        customer_email: "test@gmail.com"
+    },
+    order_meta: {
+        return_url: `https://paidtopadults.blogspot.com/p/payment-success.html?order_id=${orderId}&video_id=${videoId || ""}`
+    }
 })
-                    customer_email: "test@gmail.com"
-                },
-                order_meta: {
-                    return_url: `https://paidtopadults.blogspot.com/p/payment-success.html?order_id=${orderId}&video_id=${req.body.videoId || ""}`
-                }
-            })
         });
 
         const data = await response.json();
