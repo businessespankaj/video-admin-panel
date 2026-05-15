@@ -1,26 +1,5 @@
 // =========================
-// FIREBASE IMPORTS
-// =========================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  orderBy,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-
-// =========================
 // FIREBASE CONFIG
-// Apna Firebase config yahan paste karo
 // =========================
 const firebaseConfig = {
   apiKey: "AIzaSyBbCj86V3dVMvaG-4Z1uINgRUJmDQju_MU",
@@ -31,199 +10,258 @@ const firebaseConfig = {
   appId: "1:649136009298:web:2edd9f1369e6fd56f3af8b"
 };
 
-// =========================
-// CLOUDINARY SETTINGS
-// Cloud Name dashboard se copy karo
-// Upload Preset = video_thumbnails
-// =========================
-const CLOUDINARY_CLOUD_NAME = "dvoltkugq";
-const CLOUDINARY_UPLOAD_PRESET = "video_thumbnails";
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
 // =========================
-// INITIALIZE
+// GLOBAL VARIABLES
 // =========================
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+let editingId = null;
 
 // =========================
 // DOM ELEMENTS
 // =========================
-const loginSection = document.getElementById("login-section");
-const dashboardSection = document.getElementById("dashboard-section");
-
-const loginEmail = document.getElementById("loginEmail");
-const loginPassword = document.getElementById("loginPassword");
-const loginBtn = document.getElementById("loginBtn");
-const loginMessage = document.getElementById("loginMessage");
-
-const logoutBtn = document.getElementById("logoutBtn");
-
-const thumbnailFile = document.getElementById("thumbnailFile");
+const form = document.getElementById("videoForm");
 const titleInput = document.getElementById("title");
 const descriptionInput = document.getElementById("description");
+const thumbnailInput = document.getElementById("thumbnail");
 const priceInput = document.getElementById("price");
 const fileLinkInput = document.getElementById("fileLink");
-const saveBtn = document.getElementById("saveBtn");
-const saveMessage = document.getElementById("saveMessage");
-
+const statusInput = document.getElementById("status");
+const submitBtn = document.getElementById("submitBtn");
 const videoList = document.getElementById("videoList");
 
 // =========================
-// LOGIN
+// SAVE OR UPDATE VIDEO
 // =========================
-loginBtn.addEventListener("click", async () => {
-  const email = loginEmail.value.trim();
-  const password = loginPassword.value.trim();
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-  if (!email || !password) {
-    loginMessage.textContent = "Email aur password required hai.";
-    return;
-  }
-
-  loginMessage.textContent = "Logging in...";
+  const videoData = {
+    title: titleInput.value.trim(),
+    description: descriptionInput.value.trim(),
+    thumbnail: thumbnailInput.value.trim(),
+    price: Number(priceInput.value),
+    fileLink: fileLinkInput.value.trim(),
+    status: statusInput.value,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
 
   try {
-    await signInWithEmailAndPassword(auth, email, password);
-    loginMessage.textContent = "";
-  } catch (error) {
-    loginMessage.textContent = error.message;
-  }
-});
-
-// =========================
-// LOGOUT
-// =========================
-logoutBtn.addEventListener("click", async () => {
-  await signOut(auth);
-});
-
-// =========================
-// AUTH STATE
-// =========================
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    loginSection.classList.add("hidden");
-    dashboardSection.classList.remove("hidden");
-    await loadVideos();
-  } else {
-    loginSection.classList.remove("hidden");
-    dashboardSection.classList.add("hidden");
-  }
-});
-
-// =========================
-// CLOUDINARY UPLOAD
-// =========================
-async function uploadImage(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-    {
-      method: "POST",
-      body: formData
-    }
-  );
-
-  const data = await response.json();
-
-  if (!data.secure_url) {
-    throw new Error("Image upload failed.");
-  }
-
-  return data.secure_url;
-}
-
-// =========================
-// SAVE VIDEO
-// =========================
-saveBtn.addEventListener("click", async () => {
-  try {
-    const file = thumbnailFile.files[0];
-    const title = titleInput.value.trim();
-    const description = descriptionInput.value.trim();
-    const price = Number(priceInput.value.trim());
-    const fileLink = fileLinkInput.value.trim();
-
-    if (!file || !title || !description || !price || !fileLink) {
-      saveMessage.textContent = "Sabhi fields bharna zaroori hai.";
-      return;
+    if (editingId) {
+      // UPDATE EXISTING VIDEO
+      await db.collection("videos").doc(editingId).update(videoData);
+      alert("Video updated successfully!");
+      editingId = null;
+      submitBtn.textContent = "Save Video";
+    } else {
+      // CREATE NEW VIDEO
+      videoData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("videos").add(videoData);
+      alert("Video uploaded successfully!");
     }
 
-    saveBtn.disabled = true;
-    saveMessage.textContent = "Uploading image...";
-
-    const thumbnail = await uploadImage(file);
-
-    saveMessage.textContent = "Saving data...";
-
-    await addDoc(collection(db, "videos"), {
-      title,
-      description,
-      thumbnail,
-      price,
-      fileLink,
-      status: "active",
-      createdAt: serverTimestamp()
-    });
-
-    saveMessage.textContent = "Video successfully saved!";
-
-    thumbnailFile.value = "";
-    titleInput.value = "";
-    descriptionInput.value = "";
-    priceInput.value = "";
-    fileLinkInput.value = "";
-
-    await loadVideos();
+    form.reset();
   } catch (error) {
     console.error(error);
-    saveMessage.textContent = error.message;
-  } finally {
-    saveBtn.disabled = false;
+    alert("Error: " + error.message);
   }
 });
 
 // =========================
 // LOAD VIDEOS
 // =========================
-async function loadVideos() {
-  videoList.innerHTML = "Loading videos...";
+db.collection("videos")
+  .orderBy("createdAt", "desc")
+  .onSnapshot((snapshot) => {
+    videoList.innerHTML = "";
 
-  const q = query(
-    collection(db, "videos"),
-    orderBy("createdAt", "desc")
-  );
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const id = doc.id;
 
-  const snapshot = await getDocs(q);
+      const shareUrl = `${window.location.origin}${window.location.pathname}?video=${id}`;
 
-  if (snapshot.empty) {
-    videoList.innerHTML = "<p>No videos found.</p>";
-    return;
-  }
+      const card = document.createElement("div");
+      card.className = "video-card";
 
-  let html = "";
+      card.innerHTML = `
+        <div class="card-menu-wrapper" style="position:relative;text-align:right;">
+          <button onclick="toggleMenu('${id}')"
+                  style="background:none;border:none;font-size:28px;cursor:pointer;">
+            ⋮
+          </button>
 
-  snapshot.forEach((doc) => {
-    const data = doc.data();
+          <div id="menu-${id}"
+               style="display:none;position:absolute;right:0;top:35px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:999;min-width:140px;">
 
-    html += `
-      <div class="video-item">
-        <img src="${data.thumbnail}" alt="${data.title}">
-        <h3>${data.title}</h3>
-        <p>${data.description}</p>
-        <p><strong>₹${data.price}</strong></p>
-        <p>
-          <a href="${data.fileLink}" target="_blank" style="color:#4da3ff;">
-            Open File Link
-          </a>
-        </p>
-      </div>
-    `;
+            <button onclick="editVideo('${id}')"
+                    style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
+              ✏️ Edit
+            </button>
+
+            <button onclick="deleteVideo('${id}')"
+                    style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;color:red;cursor:pointer;">
+              🗑️ Delete
+            </button>
+
+            <button onclick="shareVideo('${shareUrl}')"
+                    style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
+              🔗 Share
+            </button>
+          </div>
+        </div>
+
+        <img src="${data.thumbnail}" alt="${escapeHtml(data.title)}"
+             style="width:100%;max-width:300px;border-radius:12px;">
+
+        <h3>${escapeHtml(data.title)}</h3>
+        <p>${escapeHtml(data.description)}</p>
+        <p><strong>₹${data.price} only</strong></p>
+        <p><small>Status: ${escapeHtml(data.status || 'active')}</small></p>
+      `;
+
+      videoList.appendChild(card);
+    });
+
+    // Agar URL me ?video=ID hai to us post par auto-scroll
+    openSharedVideo();
   });
 
-  videoList.innerHTML = html;
+// =========================
+// TOGGLE 3-DOTS MENU
+// =========================
+function toggleMenu(id) {
+  document.querySelectorAll('[id^="menu-"]').forEach(menu => {
+    if (menu.id !== `menu-${id}`) {
+      menu.style.display = 'none';
+    }
+  });
+
+  const menu = document.getElementById(`menu-${id}`);
+  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
 }
+
+// Close menu when clicking outside
+window.addEventListener('click', function(e) {
+  if (!e.target.closest('.card-menu-wrapper')) {
+    document.querySelectorAll('[id^="menu-"]').forEach(menu => {
+      menu.style.display = 'none';
+    });
+  }
+});
+
+// =========================
+// EDIT VIDEO
+// =========================
+async function editVideo(id) {
+  try {
+    const doc = await db.collection("videos").doc(id).get();
+
+    if (!doc.exists) {
+      alert("Video not found.");
+      return;
+    }
+
+    const data = doc.data();
+
+    titleInput.value = data.title || "";
+    descriptionInput.value = data.description || "";
+    thumbnailInput.value = data.thumbnail || "";
+    priceInput.value = data.price || "";
+    fileLinkInput.value = data.fileLink || "";
+    statusInput.value = data.status || "active";
+
+    editingId = id;
+    submitBtn.textContent = "Update Video";
+
+    form.scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    console.error(error);
+    alert("Error: " + error.message);
+  }
+}
+
+// =========================
+// DELETE VIDEO
+// =========================
+async function deleteVideo(id) {
+  const confirmed = confirm("Are you sure you want to delete this video?");
+
+  if (!confirmed) return;
+
+  try {
+    await db.collection("videos").doc(id).delete();
+    alert("Video deleted successfully!");
+
+    if (editingId === id) {
+      editingId = null;
+      form.reset();
+      submitBtn.textContent = "Save Video";
+    }
+  } catch (error) {
+    console.error(error);
+    alert("Error: " + error.message);
+  }
+}
+
+// =========================
+// SHARE VIDEO
+// =========================
+async function shareVideo(url) {
+  try {
+    if (navigator.share) {
+      await navigator.share({ url });
+    } else {
+      await navigator.clipboard.writeText(url);
+      alert("Link copied to clipboard!\n\n" + url);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// =========================
+// OPEN SHARED VIDEO
+// =========================
+function openSharedVideo() {
+  const params = new URLSearchParams(window.location.search);
+  const videoId = params.get('video');
+
+  if (!videoId) return;
+
+  setTimeout(() => {
+    const menus = document.querySelectorAll('[id^="menu-"]');
+
+    for (const menu of menus) {
+      const id = menu.id.replace('menu-', '');
+
+      if (id === videoId) {
+        const card = menu.closest('.video-card');
+
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.style.outline = '3px solid #4CAF50';
+          card.style.borderRadius = '12px';
+
+          setTimeout(() => {
+            card.style.outline = '';
+          }, 5000);
+        }
+
+        break;
+      }
+    }
+  }, 1000);
+}
+
+// =========================
+// HTML ESCAPE (Security)
+// =========================
+function escapeHtml(text) {
+  if (!text) return '';
+
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+        }
