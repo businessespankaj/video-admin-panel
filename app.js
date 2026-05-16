@@ -1,203 +1,181 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
 // =========================
 // FIREBASE CONFIG
 // =========================
 const firebaseConfig = {
-  apiKey: "AIzaSyBbCj86V3dVMvaG-4Z1uINgRUJmDQju_MU",
-  authDomain: "businesstg.firebaseapp.com",
-  projectId: "businesstg",
-  storageBucket: "businesstg.firebasestorage.app",
-  messagingSenderId: "649136009298",
-  appId: "1:649136009298:web:2edd9f1369e6fd56f3af8b"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.error("Auth persistence error:", err);
+});
 
 // =========================
-// GLOBAL VARIABLES
+// CLOUDINARY CONFIG
 // =========================
-let editingId = null;
+const CLOUDINARY_CLOUD_NAME = "YOUR_CLOUD_NAME";
+const CLOUDINARY_UPLOAD_PRESET = "video_thumbnails";
 
 // =========================
 // DOM ELEMENTS
 // =========================
-const form = document.getElementById("videoForm");
+const loginSection = document.getElementById("login-section");
+const dashboardSection = document.getElementById("dashboard-section");
+
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+const loginBtn = document.getElementById("loginBtn");
+const loginMessage = document.getElementById("loginMessage");
+
+const logoutBtn = document.getElementById("logoutBtn");
+
+const thumbnailFile = document.getElementById("thumbnailFile");
 const titleInput = document.getElementById("title");
 const descriptionInput = document.getElementById("description");
-const thumbnailInput = document.getElementById("thumbnail");
 const priceInput = document.getElementById("price");
 const fileLinkInput = document.getElementById("fileLink");
-const statusInput = document.getElementById("status");
-const submitBtn = document.getElementById("submitBtn");
+const saveBtn = document.getElementById("saveBtn");
+const saveMessage = document.getElementById("saveMessage");
 const videoList = document.getElementById("videoList");
 
-// =========================
-// SAVE OR UPDATE VIDEO
-// =========================
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+// Optional field; works if you add it later
+const statusInput = document.getElementById("status");
 
-  const videoData = {
-    title: titleInput.value.trim(),
-    description: descriptionInput.value.trim(),
-    thumbnail: thumbnailInput.value.trim(),
-    price: Number(priceInput.value),
-    fileLink: fileLinkInput.value.trim(),
-    status: statusInput.value,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
+// =========================
+// STATE
+// =========================
+let editingId = null;
+let currentThumbnailUrl = "";
+let videosUnsubscribe = null;
 
-  try {
-    if (editingId) {
-      // UPDATE EXISTING VIDEO
-      await db.collection("videos").doc(editingId).update(videoData);
-      alert("Video updated successfully!");
-      editingId = null;
-      submitBtn.textContent = "Save Video";
-    } else {
-      // CREATE NEW VIDEO
-      videoData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      await db.collection("videos").add(videoData);
-      alert("Video uploaded successfully!");
+// =========================
+// HELPERS
+// =========================
+function showLogin() {
+  if (loginSection) loginSection.classList.remove("hidden");
+  if (dashboardSection) dashboardSection.classList.add("hidden");
+}
+
+function showDashboard() {
+  if (loginSection) loginSection.classList.add("hidden");
+  if (dashboardSection) dashboardSection.classList.remove("hidden");
+}
+
+function resetVideoForm() {
+  editingId = null;
+  currentThumbnailUrl = "";
+  if (titleInput) titleInput.value = "";
+  if (descriptionInput) descriptionInput.value = "";
+  if (priceInput) priceInput.value = "";
+  if (fileLinkInput) fileLinkInput.value = "";
+  if (statusInput) statusInput.value = "active";
+  if (thumbnailFile) thumbnailFile.value = "";
+  if (saveBtn) saveBtn.textContent = "Save Video";
+}
+
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function uploadThumbnail(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    {
+      method: "POST",
+      body: formData
     }
+  );
 
-    form.reset();
-  } catch (error) {
-    console.error(error);
-    alert("Error: " + error.message);
+  const data = await response.json();
+
+  if (!response.ok || !data.secure_url) {
+    const msg = data?.error?.message || "Image upload failed.";
+    throw new Error(msg);
   }
-});
 
-// =========================
-// LOAD VIDEOS
-// =========================
-db.collection("videos")
-  .orderBy("createdAt", "desc")
-  .onSnapshot((snapshot) => {
-    videoList.innerHTML = "";
+  return data.secure_url;
+}
 
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      const id = doc.id;
-
-      const shareUrl = `${window.location.origin}${window.location.pathname}?video=${id}`;
-
-      const card = document.createElement("div");
-      card.className = "video-card";
-
-      card.innerHTML = `
-        <div class="card-menu-wrapper" style="position:relative;text-align:right;">
-          <button onclick="toggleMenu('${id}')"
-                  style="background:none;border:none;font-size:28px;cursor:pointer;">
-            ⋮
-          </button>
-
-          <div id="menu-${id}"
-               style="display:none;position:absolute;right:0;top:35px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:999;min-width:140px;">
-
-            <button onclick="editVideo('${id}')"
-                    style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
-              ✏️ Edit
-            </button>
-
-            <button onclick="deleteVideo('${id}')"
-                    style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;color:red;cursor:pointer;">
-              🗑️ Delete
-            </button>
-
-            <button onclick="shareVideo('${shareUrl}')"
-                    style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
-              🔗 Share
-            </button>
-          </div>
-        </div>
-
-        <img src="${data.thumbnail}" alt="${escapeHtml(data.title)}"
-             style="width:100%;max-width:300px;border-radius:12px;">
-
-        <h3>${escapeHtml(data.title)}</h3>
-        <p>${escapeHtml(data.description)}</p>
-        <p><strong>₹${data.price} only</strong></p>
-        <p><small>Status: ${escapeHtml(data.status || 'active')}</small></p>
-      `;
-
-      videoList.appendChild(card);
-    });
-
-    // Agar URL me ?video=ID hai to us post par auto-scroll
-    openSharedVideo();
-  });
-
-// =========================
-// TOGGLE 3-DOTS MENU
-// =========================
 function toggleMenu(id) {
-  document.querySelectorAll('[id^="menu-"]').forEach(menu => {
+  document.querySelectorAll('[id^="menu-"]').forEach((menu) => {
     if (menu.id !== `menu-${id}`) {
-      menu.style.display = 'none';
+      menu.style.display = "none";
     }
   });
 
   const menu = document.getElementById(`menu-${id}`);
-  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+  if (!menu) return;
+
+  menu.style.display = menu.style.display === "block" ? "none" : "block";
 }
 
-// Close menu when clicking outside
-window.addEventListener('click', function(e) {
-  if (!e.target.closest('.card-menu-wrapper')) {
-    document.querySelectorAll('[id^="menu-"]').forEach(menu => {
-      menu.style.display = 'none';
-    });
-  }
-});
-
-// =========================
-// EDIT VIDEO
-// =========================
 async function editVideo(id) {
   try {
-    const doc = await db.collection("videos").doc(id).get();
+    const snap = await getDoc(doc(db, "videos", id));
 
-    if (!doc.exists) {
+    if (!snap.exists()) {
       alert("Video not found.");
       return;
     }
 
-    const data = doc.data();
-
-    titleInput.value = data.title || "";
-    descriptionInput.value = data.description || "";
-    thumbnailInput.value = data.thumbnail || "";
-    priceInput.value = data.price || "";
-    fileLinkInput.value = data.fileLink || "";
-    statusInput.value = data.status || "active";
+    const data = snap.data();
 
     editingId = id;
-    submitBtn.textContent = "Update Video";
+    currentThumbnailUrl = data.thumbnail || "";
 
-    form.scrollIntoView({ behavior: 'smooth' });
-  } catch (error) {
-    console.error(error);
-    alert("Error: " + error.message);
-  }
-}
+    if (titleInput) titleInput.value = data.title || "";
+    if (descriptionInput) descriptionInput.value = data.description || "";
+    if (priceInput) priceInput.value = data.price || "";
+    if (fileLinkInput) fileLinkInput.value = data.fileLink || "";
+    if (statusInput) statusInput.value = data.status || "active";
+    if (thumbnailFile) thumbnailFile.value = "";
 
-// =========================
-// DELETE VIDEO
-// =========================
-async function deleteVideo(id) {
-  const confirmed = confirm("Are you sure you want to delete this video?");
+    if (saveBtn) saveBtn.textContent = "Update Video";
 
-  if (!confirmed) return;
+    if (saveMessage) {
+      saveMessage.textContent = "Edit mode active. New thumbnail file optional.";
+    }
 
-  try {
-    await db.collection("videos").doc(id).delete();
-    alert("Video deleted successfully!");
-
-    if (editingId === id) {
-      editingId = null;
-      form.reset();
-      submitBtn.textContent = "Save Video";
+    if (dashboardSection) {
+      dashboardSection.scrollIntoView({ behavior: "smooth" });
     }
   } catch (error) {
     console.error(error);
@@ -205,9 +183,27 @@ async function deleteVideo(id) {
   }
 }
 
-// =========================
-// SHARE VIDEO
-// =========================
+async function deleteVideo(id) {
+  const confirmed = confirm(
+    "Are you sure you want to delete this video?\n\nOK = Delete\nCancel = Keep it"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await deleteDoc(doc(db, "videos", id));
+    alert("Video deleted successfully!");
+
+    if (editingId === id) {
+      resetVideoForm();
+      if (saveMessage) saveMessage.textContent = "";
+    }
+  } catch (error) {
+    console.error(error);
+    alert("Error: " + error.message);
+  }
+}
+
 async function shareVideo(url) {
   try {
     if (navigator.share) {
@@ -221,146 +217,241 @@ async function shareVideo(url) {
   }
 }
 
-// =========================
-// OPEN SHARED VIDEO
-// =========================
 function openSharedVideo() {
   const params = new URLSearchParams(window.location.search);
-  const videoId = params.get('video');
+  const videoId = params.get("video");
 
   if (!videoId) return;
 
   setTimeout(() => {
-    const menus = document.querySelectorAll('[id^="menu-"]');
+    const cards = document.querySelectorAll(".video-card");
 
-    for (const menu of menus) {
-      const id = menu.id.replace('menu-', '');
+    for (const card of cards) {
+      if (card.dataset.videoId === videoId) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.style.outline = "3px solid #4CAF50";
+        card.style.borderRadius = "12px";
 
-      if (id === videoId) {
-        const card = menu.closest('.video-card');
-
-        if (card) {
-          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          card.style.outline = '3px solid #4CAF50';
-          card.style.borderRadius = '12px';
-
-          setTimeout(() => {
-            card.style.outline = '';
-          }, 5000);
-        }
+        setTimeout(() => {
+          card.style.outline = "";
+        }, 4000);
 
         break;
       }
     }
-  }, 1000);
+  }, 300);
 }
 
-// =========================
-// HTML ESCAPE (Security)
-// =========================
-function escapeHtml(text) {
-  if (!text) return '';
+function startVideoListener() {
+  if (videosUnsubscribe) return;
 
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-        }
-// =========================
-// ADMIN LOGIN SYSTEM
-// =========================
-function login() {
-  const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value.trim();
+  const q = query(collection(db, "videos"), orderBy("createdAt", "desc"));
 
-  // Apna username aur password yahan set karo
-  const ADMIN_USERNAME = "9090@gmail.com";
-  const ADMIN_PASSWORD = "9090";
+  videosUnsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      if (!videoList) return;
+      videoList.innerHTML = "";
 
-  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-    // Login success
-    document.getElementById("loginSection").style.display = "none";
-    document.getElementById("adminPanel").style.display = "block";
+      if (snapshot.empty) {
+        videoList.innerHTML = "<p>No videos found.</p>";
+        openSharedVideo();
+        return;
+      }
 
-    // Browser me login remember rakho
-    localStorage.setItem("adminLoggedIn", "true");
-  } else {
-    alert("Invalid username or password");
-  }
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+
+        const shareUrl = `${window.location.origin}${window.location.pathname}?video=${encodeURIComponent(id)}`;
+
+        const card = document.createElement("div");
+        card.className = "video-card";
+        card.dataset.videoId = id;
+
+        card.innerHTML = `
+          <div class="card-menu-wrapper" style="position:relative;text-align:right;">
+            <button type="button"
+                    onclick="toggleMenu(${JSON.stringify(id)})"
+                    style="background:none;border:none;font-size:28px;cursor:pointer;">
+              ⋮
+            </button>
+
+            <div id="menu-${id}"
+                 style="display:none;position:absolute;right:0;top:35px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:999;min-width:140px;overflow:hidden;">
+
+              <button type="button"
+                      onclick="editVideo(${JSON.stringify(id)})"
+                      style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
+                ✏️ Edit
+              </button>
+
+              <button type="button"
+                      onclick="deleteVideo(${JSON.stringify(id)})"
+                      style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;color:red;cursor:pointer;">
+                🗑️ Delete
+              </button>
+
+              <button type="button"
+                      onclick="shareVideo(${JSON.stringify(shareUrl)})"
+                      style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
+                🔗 Share
+              </button>
+            </div>
+          </div>
+
+          <img src="${escapeHtml(data.thumbnail)}"
+               alt="${escapeHtml(data.title)}"
+               style="width:100%;max-width:300px;border-radius:12px;display:block;">
+
+          <h3>${escapeHtml(data.title)}</h3>
+          <p>${escapeHtml(data.description)}</p>
+          <p><strong>₹${data.price} only</strong></p>
+          <p><small>Status: ${escapeHtml(data.status || "active")}</small></p>
+        `;
+
+        videoList.appendChild(card);
+      });
+
+      openSharedVideo();
+    },
+    (error) => {
+      console.error("Video listener error:", error);
+      if (videoList) {
+        videoList.innerHTML = `<p>Error loading videos: ${escapeHtml(error.message)}</p>`;
+      }
+    }
+  );
 }
 
-// Page load par check karo
-window.addEventListener("load", function () {
-  if (localStorage.getItem("adminLoggedIn") === "true") {
-    const loginSection = document.getElementById("loginSection");
-    const adminPanel = document.getElementById("adminPanel");
+// Expose inline handlers for the generated cards
+window.toggleMenu = toggleMenu;
+window.editVideo = editVideo;
+window.deleteVideo = deleteVideo;
+window.shareVideo = shareVideo;
 
-    if (loginSection) loginSection.style.display = "none";
-    if (adminPanel) adminPanel.style.display = "block";
-  }
-});
-
-// Logout function
-function logout() {
-  localStorage.removeItem("adminLoggedIn");
-  location.reload();
-}
 // =========================
-// LOGIN BUTTON EVENT
+// LOGIN
 // =========================
-document.getElementById("loginBtn").addEventListener("click", async () => {
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value.trim();
-    const loginMessage = document.getElementById("loginMessage");
+if (loginBtn) {
+  loginBtn.addEventListener("click", async () => {
+    const email = loginEmail?.value.trim();
+    const password = loginPassword?.value.trim();
 
     if (!email || !password) {
-        loginMessage.textContent = "Please enter email and password.";
+      if (loginMessage) loginMessage.textContent = "Please enter email and password.";
+      return;
+    }
+
+    try {
+      if (loginMessage) loginMessage.textContent = "Logging in...";
+      await signInWithEmailAndPassword(auth, email, password);
+      if (loginMessage) loginMessage.textContent = "";
+    } catch (error) {
+      if (loginMessage) loginMessage.textContent = error.message;
+      console.error(error);
+    }
+  });
+}
+
+// =========================
+// LOGOUT
+// =========================
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      resetVideoForm();
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
+  });
+}
+
+// =========================
+// SAVE OR UPDATE VIDEO
+// =========================
+if (saveBtn) {
+  saveBtn.addEventListener("click", async () => {
+    try {
+      if (!auth.currentUser) {
+        alert("Pehle login karo.");
         return;
-    }
+      }
 
-    try {
-        // Firebase Authentication login
-        await firebase.auth().signInWithEmailAndPassword(email, password);
+      const title = titleInput?.value.trim();
+      const description = descriptionInput?.value.trim();
+      const price = Number(priceInput?.value);
+      const fileLink = fileLinkInput?.value.trim();
+      const status = statusInput ? statusInput.value : "active";
+      const file = thumbnailFile?.files?.[0];
 
-        // Hide login section
-        document.getElementById("login-section").classList.add("hidden");
+      if (!title || !description || !price || !fileLink) {
+        if (saveMessage) saveMessage.textContent = "Sabhi fields bharna zaroori hai.";
+        return;
+      }
 
-        // Show dashboard
-        document.getElementById("dashboard-section").classList.remove("hidden");
+      if (saveBtn) saveBtn.disabled = true;
+      if (saveMessage) saveMessage.textContent = "Saving...";
 
-        // Clear message
-        loginMessage.textContent = "";
+      let thumbnail = currentThumbnailUrl;
 
+      if (file) {
+        if (saveMessage) saveMessage.textContent = "Uploading image...";
+        thumbnail = await uploadThumbnail(file);
+      }
+
+      if (!thumbnail) {
+        if (saveMessage) saveMessage.textContent = "Thumbnail file required hai.";
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+
+      const videoData = {
+        title,
+        description,
+        thumbnail,
+        price,
+        fileLink,
+        status,
+        updatedAt: serverTimestamp()
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, "videos", editingId), videoData);
+        if (saveMessage) saveMessage.textContent = "Video updated successfully!";
+      } else {
+        videoData.createdAt = serverTimestamp();
+        await addDoc(collection(db, "videos"), videoData);
+        if (saveMessage) saveMessage.textContent = "Video uploaded successfully!";
+      }
+
+      resetVideoForm();
     } catch (error) {
-        loginMessage.textContent = error.message;
-        console.error(error);
+      console.error(error);
+      if (saveMessage) saveMessage.textContent = "Error: " + error.message;
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
     }
-});
+  });
+}
 
 // =========================
-// LOGOUT BUTTON EVENT
+// AUTH STATE
 // =========================
-document.getElementById("logoutBtn").addEventListener("click", async () => {
-    try {
-        await firebase.auth().signOut();
-
-        document.getElementById("dashboard-section").classList.add("hidden");
-        document.getElementById("login-section").classList.remove("hidden");
-
-    } catch (error) {
-        console.error(error);
-        alert(error.message);
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    showDashboard();
+    startVideoListener();
+    if (saveMessage && !saveMessage.textContent) {
+      saveMessage.textContent = "";
     }
-});
-
-// =========================
-// AUTO LOGIN CHECK
-// =========================
-firebase.auth().onAuthStateChanged((user) => {
-    if (user) {
-        document.getElementById("login-section").classList.add("hidden");
-        document.getElementById("dashboard-section").classList.remove("hidden");
-    } else {
-        document.getElementById("dashboard-section").classList.add("hidden");
-        document.getElementById("login-section").classList.remove("hidden");
+  } else {
+    showLogin();
+    if (videosUnsubscribe) {
+      videosUnsubscribe();
+      videosUnsubscribe = null;
     }
+  }
 });
