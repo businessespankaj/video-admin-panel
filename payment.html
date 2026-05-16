@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Payment Successful</title>
 </head>
 <body>
@@ -19,12 +20,14 @@
       }
 
       try {
-        const res = await fetch(
+        const response = await fetch(
           "https://cashfree-backend-l0ev.onrender.com/verify-payment?order_id=" +
           encodeURIComponent(orderId)
         );
 
-        const data = await res.json();
+        const data = await response.json();
+
+        console.log("Verify Payment Response:", data);
 
         if (data.success && data.fileLink) {
           // Premium link automatically open hoga
@@ -34,6 +37,7 @@
             "<h2>Payment verified, but premium link not found.</h2>";
         }
       } catch (error) {
+        console.error(error);
         document.body.innerHTML =
           "<h2>Error: " + error.message + "</h2>";
       }
