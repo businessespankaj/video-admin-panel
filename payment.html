@@ -1,97 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Payment Page</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #0f0f0f;
-      color: white;
-      text-align: center;
-      padding: 30px;
-    }
-
-    .box {
-      max-width: 500px;
-      margin: auto;
-      background: #1f1f1f;
-      padding: 20px;
-      border-radius: 10px;
-    }
-
-    button {
-      background: #00c853;
-      color: white;
-      padding: 15px;
-      border: none;
-      width: 100%;
-      font-size: 18px;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 20px;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <title>Payment Successful</title>
 </head>
 <body>
+  <h2>Payment Successful! 🎉</h2>
+  <p>Redirecting to your premium content...</p>
 
-<div class="box">
-  <h2>Complete Payment</h2>
-  <p id="title">Loading...</p>
-  <h3 id="price">₹0</h3>
+  <script>
+    async function loadPremiumLink() {
+      const params = new URLSearchParams(window.location.search);
+      const orderId = params.get("order_id");
 
-  <button onclick="payNow()">Pay Now</button>
-</div>
+      if (!orderId) {
+        document.body.innerHTML = "<h2>Order ID not found.</h2>";
+        return;
+      }
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+      try {
+        const res = await fetch(
+          "https://cashfree-backend-l0ev.onrender.com/verify-payment?order_id=" +
+          encodeURIComponent(orderId)
+        );
 
-/* 🔥 YOUR FIREBASE CONFIG */
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+        const data = await res.json();
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+        if (data.success && data.fileLink) {
+          // Premium link automatically open hoga
+          window.location.href = data.fileLink;
+        } else {
+          document.body.innerHTML =
+            "<h2>Payment verified, but premium link not found.</h2>";
+        }
+      } catch (error) {
+        document.body.innerHTML =
+          "<h2>Error: " + error.message + "</h2>";
+      }
+    }
 
-/* GET VIDEO ID FROM URL */
-const urlParams = new URLSearchParams(window.location.search);
-const videoId = urlParams.get("video");
-
-let videoData = null;
-
-/* LOAD VIDEO DATA */
-async function loadVideo() {
-  const ref = doc(db, "videos", videoId);
-  const snap = await getDoc(ref);
-
-  if (snap.exists()) {
-    videoData = snap.data();
-
-    document.getElementById("title").innerText = videoData.title;
-    document.getElementById("price").innerText = "₹" + videoData.price + " only";
-  } else {
-    document.body.innerHTML = "<h2>Video not found</h2>";
-  }
-}
-
-loadVideo();
-
-/* CASHFREE PAYMENT (SIMPLIFIED FLOW) */
-async function payNow() {
-  alert("Cashfree integration next step me connect karenge 🚀");
-
-  // Yahan actual Cashfree order create hoga
-  // Abhi placeholder hai
-}
-</script>
-
+    loadPremiumLink();
+  </script>
 </body>
 </html>
