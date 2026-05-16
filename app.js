@@ -272,7 +272,7 @@ function startVideoListener() {
         card.innerHTML = `
           <div class="card-menu-wrapper" style="position:relative;text-align:right;">
             <button type="button"
-        onclick="window.toggleMenu(${JSON.stringify(id)})"
+        onclick= 'window.toggleMenu(${JSON.stringify(id)}) '
                     style="background:none;border:none;font-size:28px;cursor:pointer;">
               ⋮
             </button>
@@ -281,19 +281,19 @@ function startVideoListener() {
                  style="display:none;position:absolute;right:0;top:35px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:999;min-width:140px;overflow:hidden;">
 
               <button type="button"
-                      onclick="window.editVideo(${JSON.stringify(id)})"
+                      onclick= 'window.editVideo(${JSON.stringify(id)})'
                       style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
                 ✏️ Edit
               </button>
 
               <button type="button"
-                      onclick="window.deleteVideo(${JSON.stringify(id)})"
+                      onclick= 'window.deleteVideo(${JSON.stringify(id)}) '
                       style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;color:red;cursor:pointer;">
                 🗑️ Delete
               </button>
 
               <button type="button"
-                      onclick="window.shareVideo(${JSON.stringify(shareUrl)})"
+                      onclick= 'window.shareVideo(${JSON.stringify(shareUrl)}) '
                       style="display:block;width:100%;padding:10px;border:none;background:none;text-align:left;cursor:pointer;">
                 🔗 Share
               </button>
