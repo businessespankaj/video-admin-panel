@@ -455,3 +455,10 @@ onAuthStateChanged(auth, (user) => {
     }
   }
 });
+// =========================
+// EXPOSE FUNCTIONS TO HTML
+// =========================
+window.toggleMenu = toggleMenu;
+window.editVideo = editVideo;
+window.deleteVideo = deleteVideo;
+window.shareVideo = shareVideo;
