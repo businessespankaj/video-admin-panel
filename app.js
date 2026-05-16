@@ -304,3 +304,63 @@ function logout() {
   localStorage.removeItem("adminLoggedIn");
   location.reload();
 }
+// =========================
+// LOGIN BUTTON EVENT
+// =========================
+document.getElementById("loginBtn").addEventListener("click", async () => {
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value.trim();
+    const loginMessage = document.getElementById("loginMessage");
+
+    if (!email || !password) {
+        loginMessage.textContent = "Please enter email and password.";
+        return;
+    }
+
+    try {
+        // Firebase Authentication login
+        await firebase.auth().signInWithEmailAndPassword(email, password);
+
+        // Hide login section
+        document.getElementById("login-section").classList.add("hidden");
+
+        // Show dashboard
+        document.getElementById("dashboard-section").classList.remove("hidden");
+
+        // Clear message
+        loginMessage.textContent = "";
+
+    } catch (error) {
+        loginMessage.textContent = error.message;
+        console.error(error);
+    }
+});
+
+// =========================
+// LOGOUT BUTTON EVENT
+// =========================
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+    try {
+        await firebase.auth().signOut();
+
+        document.getElementById("dashboard-section").classList.add("hidden");
+        document.getElementById("login-section").classList.remove("hidden");
+
+    } catch (error) {
+        console.error(error);
+        alert(error.message);
+    }
+});
+
+// =========================
+// AUTO LOGIN CHECK
+// =========================
+firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+        document.getElementById("login-section").classList.add("hidden");
+        document.getElementById("dashboard-section").classList.remove("hidden");
+    } else {
+        document.getElementById("dashboard-section").classList.add("hidden");
+        document.getElementById("login-section").classList.remove("hidden");
+    }
+});
