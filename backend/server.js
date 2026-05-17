@@ -51,7 +51,7 @@ app.post("/create-order", async (req, res) => {
           customer_email: "test@gmail.com"
         },
         order_meta: {
-          return_url: "https://paidtopadults.blogspot.com/p/payment-success.html?order_id={order_id}"
+          return_url: "https://businessespankaj.github.io/video-admin-panel/payment.html"
         }
       })
     });
