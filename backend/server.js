@@ -51,7 +51,7 @@ app.post("/create-order", async (req, res) => {
           customer_email: "test@gmail.com"
         },
         order_meta: {
-          return_url: "https://businessespankaj.github.io/video-admin-panel/payment.html"
+          return_url: `https://businessespankaj.github.io/video-admin-panel/payment.html?video_id=${encodeURIComponent(videoId)}&order_id={order_id}`
         }
       })
     });
