@@ -63,53 +63,59 @@
   </div>
 
   <script>
-    async function loadPremiumLink() {
-      const params = new URLSearchParams(window.location.search);
-      const orderId = params.get("order_id");
-      const videoId = params.get("video_id");
+(async function () {
+  const params = new URLSearchParams(window.location.search);
 
-      const result = document.getElementById("result");
+  // URL se lo, agar na mile to localStorage se lo
+  const orderId =
+    params.get("order_id") || localStorage.getItem("pendingOrderId");
 
-      if (!orderId) {
-        result.textContent = "Order ID not found in URL.";
-        return;
-      }
+  const videoId =
+    params.get("video_id") || localStorage.getItem("pendingVideoId");
 
-      try {
-        const response = await fetch(
-          "https://cashfree-backend-l0ev.onrender.com/verify-payment?order_id=" +
-          encodeURIComponent(orderId) +
-          (videoId ? "&video_id=" + encodeURIComponent(videoId) : "")
-        );
+  const result = document.getElementById("result");
 
-        const data = await response.json();
-        console.log("Verify Payment Response:", data);
+  if (!orderId) {
+    result.innerHTML = "Order ID not found.";
+    return;
+  }
 
-        if (data.success && data.fileLink) {
-          result.innerHTML = `
-            <div><strong>Premium link:</strong></div>
-            <div style="margin-top:10px;">
-              <a href="${data.fileLink}" target="_blank" rel="noopener noreferrer">
-                ${data.fileLink}
-              </a>
-            </div>
-          `;
-          return;
-        }
+  if (!videoId) {
+    result.innerHTML = "Video ID not found.";
+    return;
+  }
 
-        if (data.error) {
-          result.textContent = data.error;
-          return;
-        }
+  try {
+    const response = await fetch(
+      "https://cashfree-backend-l0ev.onrender.com/verify-payment?order_id=" +
+      encodeURIComponent(orderId) +
+      "&video_id=" +
+      encodeURIComponent(videoId)
+    );
 
-        result.textContent = "Payment verified, but premium link not found.";
-      } catch (error) {
-        console.error(error);
-        result.textContent = "Error: " + error.message;
-      }
+    const data = await response.json();
+
+    if (data.success && data.fileLink) {
+      result.innerHTML = `
+        <div><strong>Premium link:</strong></div>
+        <div style="margin-top:10px;">
+          <a href="${data.fileLink}" target="_blank" rel="noopener noreferrer">
+            ${data.fileLink}
+          </a>
+        </div>
+      `;
+
+      // Payment data clear kar do
+      localStorage.removeItem("pendingOrderId");
+      localStorage.removeItem("pendingVideoId");
+      return;
     }
 
-    loadPremiumLink();
+    result.innerHTML = "Payment verified, but premium link not found.";
+  } catch (error) {
+    result.innerHTML = "Error: " + error.message;
+  }
+})();
   </script>
 </body>
 </html>
